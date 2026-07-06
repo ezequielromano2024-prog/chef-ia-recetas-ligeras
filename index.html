@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Chef IA · Recetas Ligeras</title>
+<style>
+  :root {
+    --sage: #4A7A64;
+    --sage-dark: #35594A;
+    --cream: #FAF6EE;
+    --coral: #E2703A;
+    --charcoal: #2B2B26;
+    --line: #E4DDCB;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--cream);
+    color: var(--charcoal);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 18px 20px 14px;
+    background: var(--sage);
+    color: white;
+    flex-shrink: 0;
+  }
+
+  header .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin: 0 0 2px;
+  }
+
+  header h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 24px;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  header p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    opacity: 0.85;
+  }
+
+  #chips {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    background: var(--cream);
+    border-bottom: 1px solid var(--line);
+  }
+
+  #chips::-webkit-scrollbar { display: none; }
+
+  .chip {
+    flex-shrink: 0;
+    background: white;
+    border: 1px solid var(--line);
+    color: var(--sage-dark);
+    padding: 7px 13px;
+    border-radius: 20px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .chip:active { background: var(--sage); color: white; }
+
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .msg {
+    max-width: 84%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+
+  .msg.bot {
+    align-self: flex-start;
+    background: white;
+    border: 1px solid var(--line);
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg.user {
+    align-self: flex-end;
+    background: var(--sage);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg.typing {
+    align-self: flex-start;
+    background: white;
+    border: 1px solid var(--line);
+    color: #999;
+    font-style: italic;
+  }
+
+  .msg.error {
+    align-self: flex-start;
+    background: #FDEDE7;
+    border: 1px solid #F0C4AE;
+    color: #A8451F;
+  }
+
+  form#composer {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: white;
+    border-top: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  #input {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    padding: 11px 16px;
+    font-size: 15px;
+    outline: none;
+    background: var(--cream);
+  }
+
+  #input:focus { border-color: var(--sage); }
+
+  #send {
+    background: var(--coral);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  #send:disabled { opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Recetas Ligeras · Ezequiel Romano</p>
+  <h1>Chef IA</h1>
+  <p>Preguntame lo que quieras sobre tus 50 recetas</p>
+</header>
+
+<div id="chips">
+  <div class="chip" data-msg="Recomendame una receta de desayuno rápida">🍳 Desayunos</div>
+  <div class="chip" data-msg="Dame una idea para el almuerzo de hoy">🥗 Almuerzos</div>
+  <div class="chip" data-msg="Necesito una cena liviana">🌙 Cenas</div>
+  <div class="chip" data-msg="Quiero un snack saludable">🍎 Snacks</div>
+  <div class="chip" data-msg="Armame un plan semanal con 5 recetas variadas">📅 Plan semanal</div>
+</div>
+
+<div id="chat"></div>
+
+<form id="composer">
+  <input id="input" type="text" placeholder="Escribí tu consulta..." autocomplete="off" />
+  <button id="send" type="submit">➤</button>
+</form>
+
+<script>
+  const chat = document.getElementById('chat');
+  const form = document.getElementById('composer');
+  const input = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+  const chips = document.getElementById('chips');
+
+  // Historial en formato Gemini: [{role:'user'|'model', parts:[{text}]}]
+  let history = [];
+
+  function addMessage(text, role) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  function addTyping() {
+    const div = document.createElement('div');
+    div.className = 'msg typing';
+    div.textContent = 'Chef IA está pensando...';
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  async function sendMessage(text) {
+    if (!text.trim()) return;
+
+    addMessage(text, 'user');
+    input.value = '';
+    sendBtn.disabled = true;
+    const typingEl = addTyping();
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history }),
+      });
+
+      const data = await res.json();
+      typingEl.remove();
+
+      if (!res.ok) {
+        addMessage(data.error || 'Ocurrió un error, probá de nuevo.', 'error');
+        sendBtn.disabled = false;
+        return;
+      }
+
+      addMessage(data.reply, 'bot');
+
+      // Actualizar historial para mantener contexto de la conversación
+      history.push({ role: 'user', parts: [{ text }] });
+      history.push({ role: 'model', parts: [{ text: data.reply }] });
+
+      // Limitar historial a los últimos 10 turnos para no sobrecargar el contexto
+      if (history.length > 20) {
+        history = history.slice(-20);
+      }
+    } catch (err) {
+      typingEl.remove();
+      addMessage('No se pudo conectar con el servidor. Revisá tu conexión e intentá de nuevo.', 'error');
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    sendMessage(input.value);
+  });
+
+  chips.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (chip) sendMessage(chip.dataset.msg);
+  });
+
+  // Mensaje de bienvenida
+  addMessage('¡Hola! Soy Chef IA 👩‍🍳 Puedo ayudarte a elegir recetas del ebook, reemplazar ingredientes o armar un plan semanal. ¿Con qué te ayudo?', 'bot');
+</script>
+
+</body>
+</html>
