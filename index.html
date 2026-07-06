@@ -111,7 +111,7 @@
       typingEl.remove();
 
       if (!res.ok) {
-        addMessage(data.error || "Error al consultar la IA. Probá de nuevo.", "error");
+        addMessage((data.error || "Error al consultar la IA.") + (data.detail ? " | Detalle: " + data.detail : ""), "error");
         sendBtn.disabled = false;
         input.focus();
         return;
